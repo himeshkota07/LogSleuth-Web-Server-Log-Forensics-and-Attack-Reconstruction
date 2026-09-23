@@ -7,9 +7,12 @@ brute-force logins, account takeover and data exfiltration. It groups them per a
 **OWASP Top 10 (2021)**, **MITRE ATT&CK**, **CWE** and the **Cyber Kill Chain**, gives each source a risk score, and
 recommends a fix for each weakness it finds.
 
+**Live demo:** https://logsleuth-nine.vercel.app/
+(demo log: https://logsleuth-nine.vercel.app/samples/demo_access.log)
+
 ## How to run (nothing to install)
 
-1. Double-click `index.html`. It opens in Edge or Chrome and works offline.
+1. Open the [live demo](https://logsleuth-nine.vercel.app/), or double-click `index.html` to run it offline in Edge or Chrome.
 2. Drop `samples/demo_access.log` onto the page, or paste your own Apache/Nginx log lines.
 3. Click **Analyse log** for the full dashboard, or **Live replay** to watch alerts appear as the log streams in.
 4. Click an attacker row to filter findings, and click a finding to see the evidence lines and the fix.
@@ -19,7 +22,7 @@ recommends a fix for each weakness it finds.
 
 | Path | Purpose |
 |---|---|
-| `index.html`, `css/style.css` | Dashboard page (light/dark theme, works on mobile) |
+| `index.html`, `css/style.css`, `favicon.svg` | Dashboard page (light/dark theme, works on mobile) |
 | `js/rules.js` | 15 detection rules with severity, OWASP, MITRE ATT&CK, CWE, kill-chain phase and remediation |
 | `js/engine.js` | Log parser, signature and behavioural detection, per-IP risk scoring, timeline and recommendations |
 | `js/app.js` | User interface: file/paste input, batch analysis, live replay, charts, filters, export |
@@ -27,8 +30,15 @@ recommends a fix for each weakness it finds.
 | `tools/make-demo-log.js` | Regenerates the demo log (`node tools/make-demo-log.js`) |
 | `test/engine.test.js` | 20 unit tests for the engine (`node test/engine.test.js`) |
 | `test/ui.test.js` | 15 end-to-end tests in headless Edge/Chrome (`node test/ui.test.js`) |
+| `vercel.json` | Vercel hosting config: security headers and clean URLs |
+| `.vercelignore` | Keeps `test/` and `tools/` off the live site |
 
 The tests use Node.js and the Edge/Chrome already on the machine. The page itself needs only a browser.
+To run the browser tests against the deployed site instead of the local file:
+
+```
+LS_URL=https://logsleuth-nine.vercel.app/ node test/ui.test.js
+```
 
 ## Detection approach
 
@@ -41,8 +51,26 @@ The tests use Node.js and the Edge/Chrome already on the machine. The page itsel
   - Account takeover: a successful login after 5 or more failures.
   - Request flooding: more than 120 requests in 60 s.
   - Exfiltration: a single response over 1 MB, or more than 5 MB served to one IP in total.
-- **Risk score (0-100)**: the severity weight of each distinct attack type, plus a bonus for how far along the kill
-  chain the source got.
+- **Risk score (0-100)**: the severity weight of each distinct attack type (Critical 40, High 20, Medium 8, Low 3),
+  plus a small bonus for repeated hits and a bonus for how far along the kill chain the source got.
+
+## Deployment
+
+The site is a static app (no build step, no server) hosted on Vercel from the `main` branch of this repository.
+Every push to `main` redeploys automatically.
+
+`vercel.json` serves every page with these security headers:
+
+| Header | Value / purpose |
+|---|---|
+| `Content-Security-Policy` | Only the site's own scripts can run; no plugins, framing or form submissions |
+| `X-Frame-Options` | `DENY`: the site can't be embedded in another page (clickjacking protection) |
+| `X-Content-Type-Options` | `nosniff`: files are only treated as the type the server declares |
+| `Referrer-Policy` | `no-referrer`: the site's URL isn't sent to other sites |
+| `Permissions-Policy` | Camera, microphone and location access are disabled |
+
+To deploy your own copy: import the repository at vercel.com with **Framework Preset: Other**, and leave the
+build command and output directory empty.
 
 ## Ethics and legal use
 
