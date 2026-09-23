@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LogSleuth</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="13" cy="13" r="9" fill="none" stroke="currentColor" stroke-width="3"/>
+        <line x1="20" y1="20" x2="29" y2="29" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+        <path d="M8 13h3l1.5-3 2 6 1.5-3h2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <h1>LogSleuth</h1>
+        <small>Web server log forensics &amp; attack reconstruction</small>
+      </div>
+    </div>
+    <button id="themeBtn" type="button" title="Switch light/dark theme">Theme</button>
+  </header>
+
+  <main>
+    <!-- 1. Input -->
+    <section class="card" id="inputCard">
+      <h2>1. Load an access log</h2>
+      <p class="hint">Apache / Nginx <em>combined</em> or <em>common</em> log format. Everything is analysed locally in this browser; no data leaves your computer.</p>
+      <div class="input-grid">
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose a log file">
+          <div><strong>Drop a log file here</strong></div>
+          <div>or click to browse (.log, .txt)</div>
+          <div class="status" id="fileInfo" style="margin-top:10px"></div>
+          <input type="file" id="fileInput" accept=".log,.txt,text/plain" hidden>
+        </div>
+        <textarea id="pasteBox" spellcheck="false" placeholder="...or paste log lines here, e.g.&#10;192.0.2.10 - - [14/Sep/2026:10:15:32 +0530] &quot;GET /index.html HTTP/1.1&quot; 200 5120 &quot;-&quot; &quot;Mozilla/5.0&quot;"></textarea>
+      </div>
+      <div class="toolbar">
+        <button class="primary" id="analyseBtn" type="button">Analyse log</button>
+        <button id="replayBtn" type="button" title="Stream the log line-by-line as if it were arriving live">Live replay</button>
+        <select id="speedSel" aria-label="Replay speed">
+          <option value="20">20 lines/s</option>
+          <option value="100" selected>100 lines/s</option>
+          <option value="500">500 lines/s</option>
+          <option value="2000">2000 lines/s</option>
+        </select>
+        <button id="stopBtn" type="button" disabled>Stop</button>
+        <button id="clearBtn" type="button">Clear</button>
+        <span class="spacer"></span>
+        <span class="status" id="status">No log loaded.</span>
+      </div>
+      <div class="progress" id="progress"><div></div></div>
+    </section>
+
+    <div id="results" class="hidden">
+      <!-- 2. Summary -->
+      <section class="card">
+        <h2>2. Summary</h2>
+        <div class="stats" id="stats"></div>
+        <p class="meta-line" id="rangeLine"></p>
+      </section>
+
+      <!-- 3. Live alerts -->
+      <section class="card">
+        <h2>3. Alert feed <span class="status" id="alertCount"></span></h2>
+        <p class="hint">The first time each attack type is seen from a source, plus every probable account takeover.</p>
+        <div class="feed" id="feed"></div>
+      </section>
+
+      <!-- 4. Charts -->
+      <section class="card">
+        <h2>4. Traffic timeline</h2>
+        <div class="chart-wrap" id="timeline"></div>
+        <div class="legend"><span><i style="background:var(--benign)"></i>All requests</span><span><i style="background:var(--malicious)"></i>Flagged requests</span></div>
+      </section>
+
+      <div class="grid-2 row-gap">
+        <section class="card">
+          <h2>Findings by severity</h2>
+          <div class="bars" id="sevBars"></div>
+        </section>
+        <section class="card">
+          <h2>Flagged requests by OWASP Top 10 (2021)</h2>
+          <div class="bars" id="owaspBars"></div>
+        </section>
+      </div>
+
+      <!-- 5. Attackers -->
+      <section class="card">
+        <h2>5. Threat sources (attacker profiles)</h2>
+        <p class="hint">Risk score 0-100 combines the severity of every attack type seen and how far the source progressed through the Cyber Kill Chain. Click a row to filter the findings.</p>
+        <div class="table-wrap"><table id="attackerTable"></table></div>
+      </section>
+
+      <!-- 6. Findings -->
+      <section class="card">
+        <h2>6. Findings</h2>
+        <div class="filters">
+          <select id="sevFilter" aria-label="Filter by severity">
+            <option value="">All severities</option>
+            <option>Critical</option><option>High</option><option>Medium</option><option>Low</option>
+          </select>
+          <input type="search" id="searchBox" placeholder="Filter by IP, attack type, OWASP, MITRE...">
+          <button class="chip-clear hidden" id="ipChip" type="button"></button>
+          <span class="status" id="findingCount"></span>
+        </div>
+        <div class="table-wrap"><table id="findingTable"></table></div>
+      </section>
+
+      <!-- 7. Recommendations -->
+      <section class="card">
+        <h2>7. Security recommendations</h2>
+        <p class="hint">One remediation per detected weakness, most severe first.</p>
+        <div id="recs"></div>
+      </section>
+
+      <!-- 8. Export -->
+      <section class="card">
+        <h2>8. Export</h2>
+        <div class="toolbar" style="margin-top:0">
+          <button id="expHtml" type="button">Download HTML report</button>
+          <button id="expCsv" type="button">Download findings (CSV)</button>
+          <button id="expJson" type="button">Download full results (JSON)</button>
+        </div>
+        <p class="ethics">Ethical use: LogSleuth is a passive, defensive tool. Analyse only logs from systems you own or are authorised to assess, handle them as personal data (they contain IP addresses), and follow the IT Act 2000 and your institution's policies.</p>
+      </section>
+    </div>
+  </main>
+  <footer>LogSleuth, Ethical Hacking mini project (23AML17344), B.N.M. Institute of Technology</footer>
+
+  <script src="js/rules.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
